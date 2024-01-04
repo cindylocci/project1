@@ -1,1 +1,4 @@
-jisjgiejswp
+package main
+
+func main() {
+}
