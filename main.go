@@ -1,101 +1,95 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"os"
+	"strings"
 )
 
-type RespJson struct {
-	Args struct {
-	} `json:"args"`
-	Data  string `json:"data"`
-	Files struct {
-	} `json:"files"`
-	Form struct {
-	} `json:"form"`
-	Headers struct {
-		AcceptEncoding string `json:"Accept-Encoding"`
-		Host           string `json:"Host"`
-		UserAgent      string `json:"User-Agent"`
-		XAmznTraceID   string `json:"X-Amzn-Trace-Id"`
-	} `json:"headers"`
-	JSON   any    `json:"json"`
-	Method string `json:"method"`
-	Origin string `json:"origin"`
-	URL    string `json:"url"`
+//GENERATE API KEY - https://yandex.com/dev/dictionary/
+//LOOK AT DOCUMENTATION - https://yandex.com/dev/dictionary/doc/dg/reference/lookup.html
+
+var (
+	apiKey     string                //generated yandex dict api key
+	langParam  string = `lang=en-ru` //translation direction
+	text       string                //text to translate
+	requestUrl string                //full request url
+)
+
+type ResponseJsonStruct struct {
+	Def []struct {
+		Text string `json:"text"`
+		Pos  string `json:"pos"`
+		Ts   string `json:"ts"`
+		Tr   []struct {
+			Text string `json:"text"`
+			Pos  string `json:"pos"`
+			Gen  string `json:"gen,omitempty"`
+			Fr   int    `json:"fr"`
+			Syn  []struct {
+				Text string `json:"text"`
+				Pos  string `json:"pos"`
+				Gen  string `json:"gen,omitempty"`
+				Fr   int    `json:"fr"`
+			} `json:"syn,omitempty"`
+			Mean []struct {
+				Text string `json:"text"`
+			} `json:"mean"`
+		} `json:"tr"`
+	} `json:"def"`
 }
 
 func main() {
 
-	//sendGetRequest("https://httpbin.org/anything")
-	sendPostRequest("https://httpbin.org/anything")
+	fmt.Print("> Pass API Key > ")
+	fmt.Scan(&apiKey)
+	//apiKey = `  [TESTING API KEY]  `
+
+	fmt.Print("> Enter the word you want to translate > ")
+	fmt.Scan(&text)
+
+	requestUrl = fmt.Sprintf("https://dictionary.yandex.net/api/v1/dicservice.json/lookup?key=%v&%v&text=%v", apiKey, langParam, text)
+
+	sendGetRequest(requestUrl)
 
 }
 
-// https://www.digitalocean.com/community/tutorials/how-to-make-http-requests-in-go
 func sendGetRequest(url string) {
 
-	resp, err := http.Get(url)
+	var translated []string
+
+	resp, err := http.Get(url) //Request url and get response
+
 	if err != nil {
-		fmt.Printf("error making http request: %s\n", err)
-		os.Exit(1)
+		log.Fatal("Error making http request", err)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body) //Read response
 
-	fmt.Printf("Client: got response!\n")
-	fmt.Printf("Client: status code: %d\n", resp.StatusCode)
-	fmt.Printf("Response body raw bytes: %v\n", body)
-	fmt.Printf("Response body string: %v\n", string(body))
+	fmt.Println(strings.Repeat("\u25a7 ", 50))
 
-	//Json parsing and transfer to struct
-	//create struct object to save json data to
-	var HTTPresponse RespJson
+	log.Println("Client: got response!")
+	log.Println("Client: status code:", resp.Status)
 
-	//parse json data
-	err = json.Unmarshal(body, &HTTPresponse)
+	var HTTPresponse ResponseJsonStruct //Creat structure to save and parse json respone data
+
+	err = json.Unmarshal(body, &HTTPresponse) //Unmarshal - parse json data
 	if err != nil {
 		log.Fatal("Error with parsing json", err)
 	}
 
-	//Json is structured
-	fmt.Println(HTTPresponse.Method)
-}
-
-func sendPostRequest(url string) {
-
-	bodyBytes := []byte("testing:test")
-
-	resp, err := http.Post(url, "text/html", bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		fmt.Printf("error making http request: %s\n", err)
-		os.Exit(1)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-
-	fmt.Printf("Client: got response!\n")
-	fmt.Printf("Client: status code: %d\n", resp.StatusCode)
-	fmt.Printf("Response body raw bytes: %v\n", body)
-	fmt.Printf("Response body string: %v\n", string(body))
-
-	// Json parsing and transfer to struct
-	// create struct object to save json data to
-	var HTTPresponse RespJson
-
-	//parse json data
-	err = json.Unmarshal(body, &HTTPresponse)
-	if err != nil {
-		log.Fatal("Error with parsing json", err)
+	for _, el := range HTTPresponse.Def { //Get translate fields of json and append to slice
+		for _, tr := range el.Tr {
+			translated = append(translated, tr.Text)
+		}
 	}
 
-	//Json is structured - POST
-	fmt.Println(HTTPresponse.Method)
+	fmt.Println(strings.Repeat("\u25a7 ", 50))
+	fmt.Println("Got Translation for:", text, translated)
+	fmt.Println(strings.Repeat("\u25a7 ", 50))
+
 }
